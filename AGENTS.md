@@ -36,6 +36,8 @@ SignBird is a remote signing system. These instructions apply throughout the rep
 
 ## Verifying changes
 
+- GitHub Actions runs Go checks and PostgreSQL integration tests, Maven verification, and the portal build on pull requests and pushes to `main`. Keep `.github/workflows/ci.yml` aligned with the module Makefiles.
+
 - Run `make check` from the repository root to verify all services with the local runtimes. The module Makefiles expose development commands for individual services. Use these targets in README examples.
 - Run `make dev` from the root to start the local stack with Docker Compose and `make dev-down` to stop it. The realm credentials in `dev/` and the Compose settings are for development.
 - Run `go test ./...` and `go vet ./...` in affected Go modules. Verify the build from the usual entry point when changing layout or startup.

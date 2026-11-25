@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: signbird
+          POSTGRES_PASSWORD: signbird-ci
+          POSTGRES_DB: signbird
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U signbird -d signbird"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: api-service/go.mod
+          cache-dependency-path: |
+            api-service/go.sum
+            key-certificate-service/go.sum
+            signature-activation-service/go.sum
+      - name: Check Go services
+        run: |
+          make -C api-service check
+          make -C key-certificate-service check
+          make -C signature-activation-service check
+      - name: Run PostgreSQL integration tests
+        env:
+          SIGNBIRD_TEST_DATABASE_URL: postgres://signbird:signbird-ci@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/signbird?sslmode=disable
+        run: |
+          make -C key-certificate-service test-integration
+          make -C signature-activation-service test-integration
+      - name: Validate local stack configuration
+        run: docker compose config --quiet
+
+  document-signing:
+    name: Java and CAdES
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: document-signing-service/pom.xml
+      - name: Verify the document signing service
+        run: make -C document-signing-service check
+
+  portal:
+    name: Web Portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-portal/package-lock.json
+      - name: Install locked portal dependencies
+        run: make -C web-portal install
+      - name: Check TypeScript and build the portal
+        run: make -C web-portal check
