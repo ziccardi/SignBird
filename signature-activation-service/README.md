@@ -41,3 +41,7 @@ Enrollment secrets are encrypted in PostgreSQL. This development flow supports i
 For standalone development, use `make run` and supply `SIGNBIRD_ACTIVATION_DATABASE_URL`, the Keycloak issuer and audience variables, `SIGNBIRD_ACTIVATION_API_TOKEN`, `SIGNBIRD_ACTIVATION_SIGNER_TOKEN`, and `SIGNBIRD_TOTP_ENCRYPTION_KEY` containing 32 Base64-encoded bytes. Configure the API Service with the API token and the Key & Certificate Service with the signer token. Keep the encryption key stable across restarts. The service initializes its PostgreSQL tables on startup.
 
 Run `make check` to verify this module. Set `SIGNBIRD_TEST_DATABASE_URL` to a PostgreSQL test database and run `make test-integration` to verify ownership, expiration, rate limiting, and replay handling.
+
+## License
+
+SignBird source code is licensed under [Apache License 2.0](../LICENSE).

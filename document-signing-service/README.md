@@ -17,3 +17,14 @@ The original is removed after the signed file is committed as ready, or when the
 ## Development
 
 `make check` runs the Java build and tests. The tests assemble RSA and ECDSA CAdES documents, verify their CMS signatures independently, and check that the embedded file matches the original. `make run` starts the service with the PostgreSQL connection, gateway and activation tokens, and storage directory configured as shown in `compose.yaml`.
+
+## Third-party licensing
+
+The service uses unmodified [DSS 6.4](https://github.com/esig/dss/tree/6.4#licenses) as a Maven dependency under [LGPL 2.1](https://spdx.org/licenses/LGPL-2.1-only.html). The source repository declares the Maven coordinates and version in `pom.xml`.
+
+Before publishing a JAR or OCI image that includes DSS, prepare a release package with a prominent DSS notice, the LGPL 2.1 license text and applicable copyright notices, and equivalent access from the release to the complete corresponding source for the DSS modules shipped, including any patches. Also provide the SignBird sources and build instructions for the exact release so recipients can rebuild the service against an interface-compatible modified DSS build. Verify that procedure by rebuilding and validating a P7M signature. Keep the distribution terms consistent with section 6, including modification for personal use and reverse engineering to debug such modifications.
+
+
+## License
+
+SignBird source code is licensed under [Apache License 2.0](../LICENSE).

@@ -60,3 +60,7 @@ SIGNBIRD_TEST_DATABASE_URL="$SIGNBIRD_DATABASE_URL" make test-integration
 ```
 
 The integration test creates and removes a dedicated schema in the specified database.
+
+## License
+
+SignBird source code is licensed under [Apache License 2.0](../LICENSE).

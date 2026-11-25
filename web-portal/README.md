@@ -41,3 +41,7 @@ make build
 ```
 
 Regenerate the TypeScript types whenever `../api-service/openapi.yaml` changes. The build writes static files to `dist/`. For deployment, serve `dist/` and proxy `/v1` to the API Service on the same origin. Configure Keycloak with the deployed portal’s exact redirect URI and origin.
+
+## License
+
+SignBird source code is licensed under [Apache License 2.0](../LICENSE).

@@ -43,3 +43,7 @@ Key creation and certificate issuance require a fresh six-digit TOTP code per re
 make generate
 make test
 ```
+
+## License
+
+SignBird source code is licensed under [Apache License 2.0](../LICENSE).
