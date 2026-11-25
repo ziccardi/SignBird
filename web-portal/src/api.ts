@@ -41,12 +41,12 @@ export interface KeyService {
 function read<T>(result: { data?: T; error?: { message: string }; response: Response }): T {
   if (result.data !== undefined) return result.data
   if (result.response.status === 401) {
-    throw new Error('Sessione non autorizzata. Accedi di nuovo e verifica che il token includa l’audience dell’API.')
+    throw new Error('Unauthorized session. Sign in again and check that the token includes the API audience.')
   }
   if (result.response.status >= 500 && typeof result.error !== 'object') {
-    throw new Error('API Service non raggiungibile. Verifica che i servizi SignBird siano avviati.')
+    throw new Error('API Service is unreachable. Check that the SignBird services are running.')
   }
-  throw new Error(result.error?.message || `Operazione non riuscita (HTTP ${result.response.status}).`)
+  throw new Error(result.error?.message || `Operation failed (HTTP ${result.response.status}).`)
 }
 
 export function connectApi(getToken: () => Promise<string>): KeyService {

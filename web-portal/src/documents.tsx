@@ -5,12 +5,12 @@ import { CodeField } from './authenticator'
 import type { Certificate, DocumentService, Key, P7mJob } from './api'
 
 const statuses: Record<P7mJob['status'], string> = {
-  QUEUED: 'In coda',
-  AWAITING_APPROVAL: 'In attesa di conferma',
-  SIGNING_QUEUED: 'Firma in coda',
-  READY: 'Pronto',
-  FAILED: 'Errore di elaborazione',
-  EXPIRED: 'Scaduto',
+  QUEUED: 'Queued',
+  AWAITING_APPROVAL: 'Awaiting approval',
+  SIGNING_QUEUED: 'Signing queued',
+  READY: 'Ready',
+  FAILED: 'Processing failed',
+  EXPIRED: 'Expired',
 }
 
 export function DocumentSigningPanel({ documents, keys, loadKey }: {
@@ -38,7 +38,7 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
         const list = await documents.list()
         if (active) setJobs(list)
       } catch (error) {
-        if (active) setProblem(error instanceof Error ? error.message : 'Aggiornamento non riuscito.')
+        if (active) setProblem(error instanceof Error ? error.message : 'Refresh failed.')
       } finally {
         if (active) timer = window.setTimeout(refresh, 3000)
       }
@@ -56,7 +56,7 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
     try {
       await action()
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Operazione non riuscita.')
+      setProblem(error instanceof Error ? error.message : 'Operation failed.')
     } finally {
       setBusy(false)
     }
@@ -69,29 +69,29 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
 
   return <section>
     <header className="intro">
-      <div><h1>Firma P7M</h1><p>Carica un file, approva la firma e scarica il risultato quando è pronto.</p></div>
-      <button className="secondary" disabled={busy} onClick={() => void run(async () => setJobs(await documents.list()))}><RefreshCw size={15} /> Aggiorna</button>
+      <div><h1>P7M signing</h1><p>Upload a file, approve the signature, and download the result when it is ready.</p></div>
+      <button className="secondary" disabled={busy} onClick={() => void run(async () => setJobs(await documents.list()))}><RefreshCw size={15} /> Refresh</button>
     </header>
     {problem && <p role="alert" className="feedback error">{problem}</p>}
-    {busy && <p role="status" className="feedback">Operazione in corso…</p>}
+    {busy && <p role="status" className="feedback">Working…</p>}
     <div className="panels">
       <div className="signing-column">
         <section className="panel signing-panel">
-          <h2>Carica un file</h2>
+          <h2>Upload a file</h2>
           <form className="signing-form" onSubmit={event => {
             event.preventDefault()
             if (!file || !credential) return
             void run(async () => {
-              if (file.size > 10 * 1024 * 1024 || file.size === 0) throw new Error('Carica un file non vuoto di massimo 10 MB.')
+              if (file.size > 10 * 1024 * 1024 || file.size === 0) throw new Error('Upload a non-empty file up to 10 MB.')
               show(await documents.upload(key, credential, file))
               setFile(undefined)
               if (fileInput.current) fileInput.current.value = ''
             })
           }}>
-            <label>File da firmare (max 10 MB)
+            <label>File to sign (max 10 MB)
               <input ref={fileInput} type="file" required onChange={event => setFile(event.target.files?.[0])} />
             </label>
-            <label>Chiave
+            <label>Key
               <select value={key} required disabled={busy} onChange={event => {
                 const id = event.target.value
                 setKey(id)
@@ -103,37 +103,37 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
                     Date.parse(cert.notBefore) <= now && now < Date.parse(cert.notAfter)))
                 })
               }}>
-                <option value="">Seleziona una chiave</option>
+                <option value="">Select a key</option>
                 {keys.map(item => <option key={item.keyId} value={item.keyId}>{keyOption(item, keys)}</option>)}
               </select>
             </label>
-            <label>Credenziale
+            <label>Credential
               <select value={credential} required disabled={busy || !certificates.length} onChange={event => setCredential(event.target.value)}>
-                <option value="">Seleziona un certificato</option>
+                <option value="">Select a certificate</option>
                 {certificates.map(cert => <option key={cert.credentialId} value={cert.credentialId}>{certificateOption(cert)}</option>)}
               </select>
             </label>
-            <button className="primary" disabled={busy || !credential || !file}>Accoda file</button>
+            <button className="primary" disabled={busy || !credential || !file}>Queue file</button>
           </form>
         </section>
         <section className="panel signing-panel">
-          <h2>Operazioni</h2>
+          <h2>Operations</h2>
           {jobs.length ? <ul className="signature-list">{jobs.map(item => <li key={item.jobId}>
             <button className="secondary" aria-pressed={selected === item.jobId} disabled={busy}
               onClick={() => { setSelected(item.jobId); setCode('') }}><span className="break-value">{item.filename}</span><small>{statuses[item.status]}</small></button>
-          </li>)}</ul> : <p>Nessuna operazione.</p>}
+          </li>)}</ul> : <p>No operations.</p>}
         </section>
       </div>
       <section className="panel signing-panel">
-        <h2>Dettaglio operazione</h2>
+        <h2>Operation details</h2>
         {job ? <>
           <dl className="signature-details">
             <div><dt>File</dt><dd>{job.filename}</dd></div>
-            <div><dt>Chiave</dt><dd><code>{job.keyId}</code></dd></div>
-            <div><dt>Credenziale</dt><dd><code>{job.credentialId}</code></dd></div>
-            <div><dt>Algoritmo</dt><dd>{job.signatureScheme} · SHA-256</dd></div>
-            <div><dt>Stato</dt><dd role="status">{statuses[job.status]}</dd></div>
-            <div><dt>Scadenza</dt><dd>{new Date(job.expiresAt).toLocaleString('it-IT')}</dd></div>
+            <div><dt>Key</dt><dd><code>{job.keyId}</code></dd></div>
+            <div><dt>Credential</dt><dd><code>{job.credentialId}</code></dd></div>
+            <div><dt>Algorithm</dt><dd>{job.signatureScheme} · SHA-256</dd></div>
+            <div><dt>Status</dt><dd role="status">{statuses[job.status]}</dd></div>
+            <div><dt>Expires</dt><dd>{new Date(job.expiresAt).toLocaleString('en-GB')}</dd></div>
           </dl>
           {job.status === 'AWAITING_APPROVAL' && <form className="signing-form" onSubmit={event => {
             event.preventDefault()
@@ -142,8 +142,8 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
             void run(async () => show(await documents.approve(job.jobId, submitted)))
           }}>
             <CodeField id="document-code" code={code} setCode={setCode} />
-            <button className="primary" disabled={busy}>Approva firma</button>
-            <p>Al primo utilizzo, <a href="#authenticator">configura l’autenticatore</a>.</p>
+            <button className="primary" disabled={busy}>Approve signature</button>
+            <p>For first-time use, <a href="#authenticator">set up your authenticator</a>.</p>
           </form>}
           {job.status === 'READY' && <button className="primary" disabled={busy} onClick={() => void run(async () => {
             const url = URL.createObjectURL(await documents.download(job.jobId))
@@ -152,8 +152,8 @@ export function DocumentSigningPanel({ documents, keys, loadKey }: {
             link.download = job.filename + '.p7m'
             link.click()
             setTimeout(() => URL.revokeObjectURL(url), 1000)
-          })}><ArrowDownToLine size={16} /> Scarica P7M</button>}
-        </> : <p>Seleziona un’operazione.</p>}
+          })}><ArrowDownToLine size={16} /> Download P7M</button>}
+        </> : <p>Select an operation.</p>}
       </section>
     </div>
   </section>

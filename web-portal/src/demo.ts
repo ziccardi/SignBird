@@ -24,7 +24,7 @@ export function demoApi(): KeyService {
   ]
   const detail = async (keyId: string) => {
     const key = keys.find(item => item.keyId === keyId)
-    if (!key) throw new Error('Chiave non trovata.')
+    if (!key) throw new Error('Key not found.')
     return key
   }
 

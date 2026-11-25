@@ -6,7 +6,7 @@ import type { ActivationService, Certificate, Key, KeyCapability, DigestInput, S
 
 function digestToBase64(hex: string, digestBytes: number) {
   if (hex.length !== digestBytes * 2 || !/^[a-f0-9]+$/i.test(hex)) {
-    throw new Error(`Inserisci un digest di ${digestBytes * 2} caratteri esadecimali.`)
+    throw new Error(`Enter a ${digestBytes * 2}-character hexadecimal digest.`)
   }
   const pairs = hex.match(/../g)!
   return btoa(String.fromCharCode(...pairs.map(pair => Number.parseInt(pair, 16))))
@@ -16,7 +16,7 @@ function digestToHex(base64: string) {
   return Array.from(atob(base64), byte => byte.charCodeAt(0).toString(16).padStart(2, '0')).join('')
 }
 
-const statuses = { PENDING: 'In attesa', SIGNED: 'Firmata', EXPIRED: 'Scaduta' }
+const statuses = { PENDING: 'Pending', SIGNED: 'Signed', EXPIRED: 'Expired' }
 
 export function SigningPanel({ activation, keys, capabilities, loadKey }: {
   activation: ActivationService
@@ -46,7 +46,7 @@ export function SigningPanel({ activation, keys, capabilities, loadKey }: {
     try {
       await action()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Operazione non riuscita.')
+      setError(err instanceof Error ? err.message : 'Operation failed.')
     } finally {
       setBusy(false)
     }
@@ -70,16 +70,16 @@ export function SigningPanel({ activation, keys, capabilities, loadKey }: {
   return (
     <section className="signing">
       <header className="intro">
-        <div><h1>Firma digest</h1><p>Firma subito un digest con un codice dell’app di autenticazione.</p></div>
-        <button className="secondary" disabled={busy} onClick={() => void run(refresh)}><RefreshCw size={15} /> Aggiorna richieste</button>
+        <div><h1>Sign digest</h1><p>Sign a digest using a code from your authenticator app.</p></div>
+        <button className="secondary" disabled={busy} onClick={() => void run(refresh)}><RefreshCw size={15} /> Refresh requests</button>
       </header>
       {error && <p className="feedback error" role="alert">{error}</p>}
-      {busy && <p className="feedback" role="status">Operazione in corso…</p>}
-      {enabled === false && <p className="feedback">Prima di firmare, <a href="#authenticator">configura l’autenticatore</a>.</p>}
+      {busy && <p className="feedback" role="status">Working…</p>}
+      {enabled === false && <p className="feedback">Before signing, <a href="#authenticator">set up your authenticator</a>.</p>}
       {enabled && <div className="panels">
         <div className="signing-column">
           <section className="panel signing-panel">
-            <h2>Nuova richiesta</h2>
+            <h2>New request</h2>
             <form className="signing-form" onSubmit={event => {
               event.preventDefault()
               if (!profile || !hash) return
@@ -91,7 +91,7 @@ export function SigningPanel({ activation, keys, capabilities, loadKey }: {
               }, code)))
               setCode('')
             }}>
-              <label htmlFor="signing-key">Chiave
+              <label htmlFor="signing-key">Key
                 <select id="signing-key" defaultValue="" disabled={busy} onChange={event => {
                   const id = event.target.value
                   setKeyId(id)
@@ -107,63 +107,63 @@ export function SigningPanel({ activation, keys, capabilities, loadKey }: {
                       Date.parse(item.notBefore) <= now && now < Date.parse(item.notAfter)))
                   })
                 }}>
-                  <option value="">Seleziona una chiave</option>
+                  <option value="">Select a key</option>
                   {keys.map(key => <option key={key.keyId} value={key.keyId}>{keyOption(key, keys)}</option>)}
                 </select>
               </label>
-              <label htmlFor="signing-credential">Credenziale
+              <label htmlFor="signing-credential">Credential
                 <select id="signing-credential" value={credential} onChange={event => setCredential(event.target.value)} required disabled={busy || !certificates.length}>
-                  <option value="">{certificates.length ? 'Seleziona un certificato' : 'Nessun certificato disponibile'}</option>
+                  <option value="">{certificates.length ? 'Select a certificate' : 'No certificates available'}</option>
                   {certificates.map(cert => <option key={cert.credentialId} value={cert.credentialId}>{certificateOption(cert)}</option>)}
                 </select>
               </label>
-              <label>Algoritmo di hash
+              <label>Hash algorithm
                 <select value={hash?.algorithm ?? ''} disabled={!profile || busy} onChange={event => {
                   setHashAlgorithm(profile?.hashAlgorithms.find(item => item.algorithm === event.target.value)?.algorithm)
                 }}>
-                  {!profile && <option value="">Seleziona prima una chiave</option>}
+                  {!profile && <option value="">Select a key first</option>}
                   {profile?.hashAlgorithms.map(item => <option key={item.algorithm}>{item.algorithm}</option>)}
                 </select>
               </label>
-              <label>Digest esadecimale{hash ? ` (${hash.digestBytes * 2} caratteri)` : ''}
+              <label>Hexadecimal digest{hash ? ` (${hash.digestBytes * 2} characters)` : ''}
                 <input value={digest} onChange={event => setDigest(event.target.value)} required disabled={!hash}
                   pattern={hash ? `[a-fA-F0-9]{${hash.digestBytes * 2}}` : undefined} spellCheck={false} />
               </label>
               <CodeField id="signing-code" code={code} setCode={setCode} />
-              <button className="primary" disabled={busy || !credential || !hash}>Firma digest</button>
+              <button className="primary" disabled={busy || !credential || !hash}>Sign digest</button>
             </form>
           </section>
           <section className="panel signing-panel">
-            <h2>Richieste di firma</h2>
+            <h2>Signing requests</h2>
             {requests.length ? <ul className="signature-list">{requests.map(item => <li key={item.requestId}>
               <button className="secondary" aria-pressed={selected === item.requestId} disabled={busy} onClick={() => {
                 setSelected(item.requestId)
                 setApprovalCode('')
                 setError('')
               }}><code>{item.requestId}</code><span>{statuses[item.status]}</span></button>
-            </li>)}</ul> : <p>Nessuna richiesta.</p>}
+            </li>)}</ul> : <p>No requests.</p>}
           </section>
         </div>
         <section className="panel signing-panel">
-          <h2>Dettaglio richiesta</h2>
-          {!request ? <p>Seleziona una richiesta.</p> : <>
+          <h2>Request details</h2>
+          {!request ? <p>Select a request.</p> : <>
             <dl className="signature-details">
-              <div><dt>Chiave</dt><dd><code>{request.keyId}</code></dd></div>
-              <div><dt>Credenziale</dt><dd><code>{request.credentialId}</code></dd></div>
+              <div><dt>Key</dt><dd><code>{request.keyId}</code></dd></div>
+              <div><dt>Credential</dt><dd><code>{request.credentialId}</code></dd></div>
               <div><dt>Digest</dt><dd><code>{digestToHex(request.digest)}</code></dd></div>
-              <div><dt>Schema</dt><dd>{request.signatureScheme} · {request.hashAlgorithm}</dd></div>
-              {request.status !== 'SIGNED' && <div><dt>Scadenza</dt><dd>{new Date(request.expiresAt).toLocaleString('it-IT')}</dd></div>}
-              <div><dt>Stato</dt><dd>{statuses[request.status]}</dd></div>
+              <div><dt>Scheme</dt><dd>{request.signatureScheme} · {request.hashAlgorithm}</dd></div>
+              {request.status !== 'SIGNED' && <div><dt>Expires</dt><dd>{new Date(request.expiresAt).toLocaleString('en-GB')}</dd></div>}
+              <div><dt>Status</dt><dd>{statuses[request.status]}</dd></div>
             </dl>
             {request.status === 'PENDING' && <form className="signing-form" onSubmit={event => {
               event.preventDefault()
               void run(async () => show(await activation.approve(request.requestId, approvalCode)))
             }}>
-              <p>Usa un codice nuovo dopo la configurazione o un’altra approvazione.</p>
+              <p>Use a fresh code after setup or another approval.</p>
               <CodeField id="approval-code" code={approvalCode} setCode={setApprovalCode} />
-              <button className="primary" disabled={busy}>Approva e firma</button>
+              <button className="primary" disabled={busy}>Approve and sign</button>
             </form>}
-            {request.signature && <label className="signature-result">Firma Base64<textarea value={request.signature} readOnly rows={5} /></label>}
+            {request.signature && <label className="signature-result">Base64 signature<textarea value={request.signature} readOnly rows={5} /></label>}
           </>}
         </section>
       </div>}

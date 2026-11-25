@@ -13,7 +13,7 @@ SignBird is a remote signing system. These instructions apply throughout the rep
 
 ## Language
 
-- Use English for source code, identifiers, comments, URLs, and all project documentation, including READMEs and agent instructions. Use English for URL paths, parameters, and fragments. Localized user-facing text follows the interface language.
+- Use English for source code, identifiers, comments, URLs, and all project documentation, including READMEs and agent instructions. Use English for URL paths, parameters, and fragments. Use English for all Web Portal copy, including labels, messages, and accessibility text.
 
 ## Go conventions and contracts
 

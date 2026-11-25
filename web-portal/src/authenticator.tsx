@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ActivationService } from './api'
 
 export function CodeField({ id, code, setCode }: { id: string; code: string; setCode: (value: string) => void }) {
-  return <label htmlFor={id}>Codice a sei cifre
+  return <label htmlFor={id}>Six-digit code
     <input id={id} value={code} onChange={event => setCode(event.target.value)} inputMode="numeric"
       autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required />
   </label>
@@ -26,10 +26,10 @@ function SetupQrCode({ secret, account }: { secret: string; account: string }) {
     return () => { active = false }
   }, [secret, account])
 
-  if (failed) return <p role="status">QR code non disponibile. Usa la chiave di configurazione qui sotto.</p>
-  if (!image) return <p role="status">Generazione QR code…</p>
+  if (failed) return <p role="status">The QR code is unavailable. Use the setup key below.</p>
+  if (!image) return <p role="status">Generating QR code…</p>
   return <img className="authenticator-qr" src={image} width={220} height={220}
-    alt="QR code da scansionare con l’app di autenticazione" />
+    alt="QR code to scan with your authenticator app" />
 }
 
 export function AuthenticatorPanel({ activation, account }: { activation: ActivationService; account: string }) {
@@ -45,7 +45,7 @@ export function AuthenticatorPanel({ activation, account }: { activation: Activa
     try {
       await action()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Operazione non riuscita.')
+      setError(err instanceof Error ? err.message : 'Operation failed.')
     } finally {
       setBusy(false)
     }
@@ -59,14 +59,14 @@ export function AuthenticatorPanel({ activation, account }: { activation: Activa
 
   return <section>
     <header className="intro">
-      <div><h1>Autenticatore</h1><p>Usa un codice monouso per le operazioni su chiavi, certificati e firme.</p></div>
+      <div><h1>Authenticator</h1><p>Use a one-time code for key, certificate, and signing operations.</p></div>
     </header>
     <div className="panel signing-panel">
-      <h2>Configurazione</h2>
+      <h2>Setup</h2>
       {error && <p className="feedback error" role="alert">{error}</p>}
-      {busy && <p role="status">Operazione in corso…</p>}
-      {enabled === true && <p role="status">Autenticatore attivo.</p>}
-      {enabled === undefined && !busy && <button className="secondary" onClick={loadStatus}>Riprova</button>}
+      {busy && <p role="status">Working…</p>}
+      {enabled === true && <p role="status">Authenticator enabled.</p>}
+      {enabled === undefined && !busy && <button className="secondary" onClick={loadStatus}>Try again</button>}
       {enabled === false && (secret ? <form className="signing-form" onSubmit={event => {
         event.preventDefault()
         void run(async () => {
@@ -76,14 +76,14 @@ export function AuthenticatorPanel({ activation, account }: { activation: Activa
           setCode('')
         })
       }}>
-        <p>In Google Authenticator, tocca <strong>+</strong> e scansiona il QR code.</p>
+        <p>In Google Authenticator, tap <strong>+</strong> and scan the QR code.</p>
         <SetupQrCode secret={secret} account={account} />
-        <p>Per l’inserimento manuale, scegli una chiave basata sul tempo.</p>
-        <p><strong>Nome account</strong> SignBird ({account})</p>
-        <p><strong>Chiave di configurazione</strong> <code className="break-value">{secret}</code></p>
+        <p>To enter the key manually, select the time-based option.</p>
+        <p><strong>Account name</strong> SignBird ({account})</p>
+        <p><strong>Setup key</strong> <code className="break-value">{secret}</code></p>
         <CodeField id="enrollment-code" code={code} setCode={setCode} />
-        <button className="primary" disabled={busy}>Conferma configurazione</button>
-      </form> : <button className="primary" disabled={busy} onClick={() => void run(async () => setSecret((await activation.enroll()).secret))}>Configura autenticatore</button>)}
+        <button className="primary" disabled={busy}>Confirm setup</button>
+      </form> : <button className="primary" disabled={busy} onClick={() => void run(async () => setSecret((await activation.enroll()).secret))}>Set up authenticator</button>)}
     </div>
   </section>
 }
