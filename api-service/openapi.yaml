@@ -1,0 +1,640 @@
+openapi: 3.0.3
+info:
+  title: SignBird API
+  version: 0.1.0
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      operationId: health
+      security: []
+      responses:
+        '204':
+          description: Service is running
+  /v1/keys:
+    post:
+      operationId: createKey
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKeyRequest'
+      responses:
+        '201':
+          description: Test key created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Key'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+    get:
+      operationId: listKeys
+      responses:
+        '200':
+          description: Keys owned by the caller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Key'
+        '401':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /v1/keys/capabilities:
+    get:
+      operationId: getKeyCapabilities
+      responses:
+        '200':
+          description: Key and digest signing profiles supported by the test keystore
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KeyCapability'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/keys/{keyId}:
+    get:
+      operationId: getKey
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+      responses:
+        '200':
+          description: Key owned by the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Key'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: renameKey
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAliasRequest'
+      responses:
+        '204':
+          description: Alias updated
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/keys/{keyId}/certificates/{certificateId}:
+    patch:
+      operationId: renameCertificate
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: certificateId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAliasRequest'
+      responses:
+        '204':
+          description: Alias updated
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/certificates:
+    post:
+      operationId: issueCertificate
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueCertificateRequest'
+      responses:
+        '201':
+          description: Test certificate and signing credential issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /v1/activation/totp:
+    get:
+      operationId: getTotpStatus
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TotpStatus'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: startTotpEnrollment
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TotpEnrollment'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/activation/totp/confirm:
+    post:
+      operationId: confirmTotpEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpCode'
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TotpStatus'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/digest:
+    get:
+      operationId: listDigestSignatures
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SignatureRequest'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createDigestSignature
+      parameters:
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDigestSignatureRequest'
+      responses:
+        '200':
+          description: Digest signed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedDigest'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/digest/{requestId}:
+    get:
+      operationId: getDigestSignature
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureRequest'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/digest/{requestId}/approve:
+    post:
+      operationId: approveDigestSignature
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpCode'
+      responses:
+        '200':
+          description: Operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureRequest'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/p7m:
+    post:
+      operationId: uploadP7m
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [keyId, credentialId, file]
+              properties:
+                keyId:
+                  type: string
+                credentialId:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: Document preparation queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/P7mJob'
+        default:
+          $ref: '#/components/responses/Error'
+    get:
+      operationId: listP7m
+      responses:
+        '200':
+          description: Recent document signing operations owned by the caller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/P7mJob'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/p7m/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentJobId'
+    get:
+      operationId: getP7m
+      responses:
+        '200':
+          description: Document signing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/P7mJob'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/p7m/{jobId}/approve:
+    parameters:
+      - $ref: '#/components/parameters/DocumentJobId'
+    post:
+      operationId: approveP7m
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TotpCode'
+      responses:
+        '202':
+          description: Approved document signing queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/P7mJob'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/signatures/p7m/{jobId}/download:
+    parameters:
+      - $ref: '#/components/parameters/DocumentJobId'
+    get:
+      operationId: downloadP7m
+      responses:
+        '200':
+          description: Signed CAdES document with the original included
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/pkcs7-mime:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+
+components:
+  parameters:
+    DocumentJobId:
+      in: path
+      name: jobId
+      required: true
+      schema:
+        type: string
+    TotpCodeHeader:
+      in: header
+      name: X-TOTP-Code
+      required: true
+      description: Fresh six-digit authenticator code for this change
+      schema:
+        type: string
+        pattern: '^[0-9]{6}$'
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      description: Reuse the same value to retry a creation or issuance.
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9._-]{1,128}$'
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Error:
+      description: Request failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    KeyCapability:
+      type: object
+      required: [algorithm, signatureScheme, hashAlgorithms]
+      properties:
+        algorithm:
+          $ref: '#/components/schemas/KeyAlgorithm'
+        signatureScheme:
+          $ref: '#/components/schemas/SignatureScheme'
+        hashAlgorithms:
+          type: array
+          items:
+            $ref: '#/components/schemas/DigestCapability'
+    DigestCapability:
+      type: object
+      required: [algorithm, digestBytes]
+      properties:
+        algorithm:
+          $ref: '#/components/schemas/HashAlgorithm'
+        digestBytes:
+          type: integer
+    KeyAlgorithm:
+      type: string
+      enum: [RSA-2048, ECDSA-P256, ECDSA-P521]
+    CreateKeyRequest:
+      type: object
+      additionalProperties: false
+      required: [keystoreId]
+      properties:
+        alias:
+          $ref: '#/components/schemas/Alias'
+        keystoreId:
+          type: string
+          enum: [pkcs12-test]
+        algorithm:
+          $ref: '#/components/schemas/KeyAlgorithm'
+    Key:
+      type: object
+      required: [keyId, keystoreId, algorithm, publicKey, createdAt, status]
+      properties:
+        alias:
+          $ref: '#/components/schemas/Alias'
+        keyId:
+          type: string
+        keystoreId:
+          type: string
+        algorithm:
+          $ref: '#/components/schemas/KeyAlgorithm'
+        publicKey:
+          type: string
+          description: PEM-encoded SubjectPublicKeyInfo
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [ACTIVE]
+        certificates:
+          type: array
+          description: Certificate history included in the key detail
+          items:
+            $ref: '#/components/schemas/Certificate'
+    IssueCertificateRequest:
+      type: object
+      additionalProperties: false
+      required: [keyId]
+      properties:
+        alias:
+          $ref: '#/components/schemas/Alias'
+        keyId:
+          type: string
+    Certificate:
+      type: object
+      required: [certificateId, credentialId, certificatePem, chainPem, notBefore, notAfter]
+      properties:
+        alias:
+          $ref: '#/components/schemas/Alias'
+        certificateId:
+          type: string
+        credentialId:
+          type: string
+        certificatePem:
+          type: string
+        chainPem:
+          type: string
+        notBefore:
+          type: string
+          format: date-time
+        notAfter:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    TotpStatus:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    TotpEnrollment:
+      type: object
+      required: [secret]
+      properties:
+        secret:
+          type: string
+          description: Base32 setup key for a six-digit, 30-second SHA-1 TOTP entry
+    TotpCode:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+    HashAlgorithm:
+      type: string
+      enum: [SHA-256, SHA-512]
+    SignatureScheme:
+      type: string
+      enum: [RSASSA-PKCS1-v1_5, ECDSA]
+    CreateDigestSignatureRequest:
+      type: object
+      additionalProperties: false
+      required: [credentialId, digest, hashAlgorithm, signatureScheme]
+      properties:
+        credentialId:
+          type: string
+        digest:
+          type: string
+          description: Standard Base64 encoding of 32 prehashed bytes for SHA-256 or 64 for SHA-512
+        hashAlgorithm:
+          $ref: '#/components/schemas/HashAlgorithm'
+        signatureScheme:
+          $ref: '#/components/schemas/SignatureScheme'
+    SignatureRequest:
+      type: object
+      required: [requestId, credentialId, keyId, digest, hashAlgorithm, signatureScheme, expiresAt, status]
+      properties:
+        requestId:
+          type: string
+        credentialId:
+          type: string
+        keyId:
+          type: string
+        digest:
+          type: string
+        hashAlgorithm:
+          $ref: '#/components/schemas/HashAlgorithm'
+        signatureScheme:
+          $ref: '#/components/schemas/SignatureScheme'
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, SIGNED, EXPIRED]
+        signature:
+          type: string
+          description: Standard Base64 signature. ECDSA signatures use ASN.1 DER, present after approval
+
+    SignedDigest:
+      allOf:
+        - $ref: '#/components/schemas/SignatureRequest'
+        - type: object
+          required: [signature]
+          properties:
+            signature:
+              type: string
+              description: Standard Base64 signature. ECDSA signatures use ASN.1 DER
+
+    P7mJob:
+      type: object
+      required: [jobId, filename, keyId, credentialId, status, signatureScheme, createdAt, expiresAt]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        keyId:
+          type: string
+        credentialId:
+          type: string
+        status:
+          type: string
+          enum: [QUEUED, AWAITING_APPROVAL, SIGNING_QUEUED, READY, FAILED, EXPIRED]
+        signatureScheme:
+          $ref: '#/components/schemas/SignatureScheme'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+
+    Alias:
+      type: string
+      maxLength: 80
+      description: Optional display name. An empty string clears the alias.
+    UpdateAliasRequest:
+      type: object
+      required: [alias]
+      additionalProperties: false
+      properties:
+        alias:
+          $ref: '#/components/schemas/Alias'

@@ -1,0 +1,41 @@
+{
+  "realm": "signbird",
+  "enabled": true,
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "signbird-web",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://127.0.0.1:5173/"],
+      "webOrigins": ["http://127.0.0.1:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "protocolMappers": [
+        {
+          "name": "SignBird API audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "signbird-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "signbird-test",
+      "enabled": true,
+      "firstName": "SignBird",
+      "lastName": "Test",
+      "email": "signbird-test@example.test",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "signbird-test", "temporary": false }]
+    }
+  ]
+}

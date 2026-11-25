@@ -1,0 +1,15 @@
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Local runtime data and key material
+/data/
+*.p12
+*.pfx
+*.key
+
+# macOS and local editor settings
+.DS_Store
+.idea/
+.vscode/

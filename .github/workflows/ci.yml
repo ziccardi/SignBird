@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    name: Conventional Commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate pull request commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import re
+          import subprocess
+
+          header = re.compile(r'[a-zA-Z][a-zA-Z0-9-]*(?:\([^()]+\))?!?: \S.*')
+          revision_range = os.environ["BASE_SHA"] + ".." + os.environ["HEAD_SHA"]
+          entries = subprocess.check_output(
+              ["git", "log", "-z", "--format=%H%x00%B", revision_range],
+              text=True,
+          ).split("\0")
+          invalid = []
+          for commit, message in zip(entries[::2], entries[1::2]):
+              lines = message.splitlines()
+              if not lines or not header.fullmatch(lines[0]) or (len(lines) > 1 and lines[1].strip()):
+                  invalid.append(commit)
+
+          if invalid:
+              print("Invalid Conventional Commits format in: " + ", ".join(invalid))
+              print("Expected: type(scope): description, optionally followed by a blank line and a body.")
+              raise SystemExit(1)
+          PYTHON
+
+  go:
+    name: Go and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: signbird
+          POSTGRES_PASSWORD: signbird-ci
+          POSTGRES_DB: signbird
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U signbird -d signbird"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: api-service/go.mod
+          cache-dependency-path: |
+            api-service/go.sum
+            key-certificate-service/go.sum
+            signature-activation-service/go.sum
+      - name: Check Go services
+        run: |
+          make -C api-service check
+          make -C key-certificate-service check
+          make -C signature-activation-service check
+      - name: Run PostgreSQL integration tests
+        env:
+          SIGNBIRD_TEST_DATABASE_URL: postgres://signbird:signbird-ci@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/signbird?sslmode=disable
+        run: |
+          make -C key-certificate-service test-integration
+          make -C signature-activation-service test-integration
+      - name: Validate local stack configuration
+        run: docker compose config --quiet
+
+  document-signing:
+    name: Java and CAdES
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: document-signing-service/pom.xml
+      - name: Verify the document signing service
+        run: make -C document-signing-service check
+
+  portal:
+    name: Web Portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-portal/package-lock.json
+      - name: Install locked portal dependencies
+        run: make -C web-portal install
+      - name: Check TypeScript and build the portal
+        run: make -C web-portal check
+
+  changelog:
+    name: Generate changelog
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Generate changelog from Git history
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$PWD,dst=/repo,readonly" --workdir /repo \
+            orhunp/git-cliff@sha256:0f72b15def11c5836c9dfb2e4da8b9b52b4bc2c8c2f46c47701b7e68f3998ff7 \
+            > CHANGELOG.md
+      - name: Upload changelog
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: changelog
+          path: CHANGELOG.md
+          if-no-files-found: error
