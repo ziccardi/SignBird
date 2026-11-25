@@ -10,6 +10,44 @@ permissions:
   contents: read
 
 jobs:
+  conventional-commits:
+    name: Conventional Commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate pull request commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import re
+          import subprocess
+
+          header = re.compile(r'[a-zA-Z][a-zA-Z0-9-]*(?:\([^()]+\))?!?: \S.*')
+          revision_range = os.environ["BASE_SHA"] + ".." + os.environ["HEAD_SHA"]
+          entries = subprocess.check_output(
+              ["git", "log", "-z", "--format=%H%x00%B", revision_range],
+              text=True,
+          ).split("\0")
+          invalid = []
+          for commit, message in zip(entries[::2], entries[1::2]):
+              lines = message.splitlines()
+              if not lines or not header.fullmatch(lines[0]) or (len(lines) > 1 and lines[1].strip()):
+                  invalid.append(commit)
+
+          if invalid:
+              print("Invalid Conventional Commits format in: " + ", ".join(invalid))
+              print("Expected: type(scope): description, optionally followed by a blank line and a body.")
+              raise SystemExit(1)
+          PYTHON
+
   go:
     name: Go and PostgreSQL
     runs-on: ubuntu-latest
