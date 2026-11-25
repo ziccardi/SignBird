@@ -1,4 +1,4 @@
-module signbird/key-certificate-service
+module github.com/ziccardi/SignBird/key-certificate-service
 
 go 1.24.0
 

@@ -1,4 +1,4 @@
-module signbird/signature-activation-service
+module github.com/ziccardi/SignBird/signature-activation-service
 
 go 1.24.0
 

@@ -12,7 +12,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"signbird/key-certificate-service/internal/db"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/db"
 )
 
 type identity struct {

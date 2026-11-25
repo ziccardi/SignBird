@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"signbird/key-certificate-service/internal/keycert"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/keycert"
 )
 
 func main() {

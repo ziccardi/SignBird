@@ -1,4 +1,4 @@
-module signbird/api-service
+module github.com/ziccardi/SignBird/api-service
 
 go 1.24.0
 

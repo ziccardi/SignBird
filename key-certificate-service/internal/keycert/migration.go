@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"signbird/key-certificate-service/internal/db"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/db"
 )
 
 func migrate(ctx context.Context, pool *pgxpool.Pool, legacyDir, password string) error {

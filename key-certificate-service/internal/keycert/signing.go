@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
-	"signbird/key-certificate-service/internal/db"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/db"
 )
 
 func (s *service) testSigner() http.Handler {

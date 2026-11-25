@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"signbird/key-certificate-service/internal/db"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/db"
 )
 
 func validateAlias(w http.ResponseWriter, alias string) (string, bool) {

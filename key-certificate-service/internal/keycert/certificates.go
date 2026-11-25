@@ -13,7 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"signbird/key-certificate-service/internal/db"
+	"github.com/ziccardi/SignBird/key-certificate-service/internal/db"
 )
 
 type testCA struct {

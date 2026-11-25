@@ -1,6 +1,6 @@
 package main
 
-import "signbird/signature-activation-service/internal/activation"
+import "github.com/ziccardi/SignBird/signature-activation-service/internal/activation"
 
 func main() {
 	activation.Run()
