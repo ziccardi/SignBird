@@ -1,0 +1,206 @@
+name: signbird-dev
+
+x-service-env: &service-env
+  SIGNBIRD_OIDC_ISSUER: http://localhost:8180/realms/signbird
+  SIGNBIRD_OIDC_AUDIENCE: signbird-api
+  SIGNBIRD_INTERNAL_TOKEN: signbird-local-only-service-token-0001
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: signbird
+      POSTGRES_PASSWORD: signbird-dev
+      POSTGRES_DB: signbird
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "signbird", "-d", "signbird"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.7
+    command: ["start-dev", "--import-realm", "--http-port=8180", "--hostname=http://localhost:8180"]
+    ports:
+      - "127.0.0.1:8180:8180"
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./dev/signbird-realm.json:/opt/keycloak/data/import/signbird-realm.json:ro
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8180
+          printf 'GET /realms/signbird/.well-known/openid-configuration HTTP/1.1\r\nHost: localhost:8180\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == "HTTP/1.1 200 "* ]]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 20s
+
+  key-certificate-service:
+    image: golang:1.25-bookworm
+    working_dir: /workspace
+    # Share loopback so the browser and services use the same OIDC issuer.
+    network_mode: service:keycloak
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+      SIGNBIRD_DATABASE_URL: postgres://signbird:signbird-dev@postgres:5432/signbird?sslmode=disable
+      SIGNBIRD_ACTIVATION_SIGNER_TOKEN: signbird-local-only-activation-signer-0001
+      SIGNBIRD_PKCS12_PASSWORD: signbird-local-only
+      SIGNBIRD_TEST_CA_CERT: /ca/ca.pem
+      SIGNBIRD_TEST_CA_KEY: /ca/ca.key
+    volumes:
+      - ./key-certificate-service:/workspace:ro
+      - go-modules:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+      - test-ca:/ca
+    command:
+      - sh
+      - -ec
+      - |
+        if [ ! -s "$$SIGNBIRD_TEST_CA_CERT" ] || [ ! -s "$$SIGNBIRD_TEST_CA_KEY" ]; then
+          umask 077
+          openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj '/CN=SignBird Development CA' \
+            -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+            -out "$$SIGNBIRD_TEST_CA_CERT" -keyout "$$SIGNBIRD_TEST_CA_KEY"
+        fi
+        go build -o /tmp/key-certificate-service ./cmd/key-certificate-service
+        /tmp/key-certificate-service migrate
+        exec /tmp/key-certificate-service
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/8081"]
+      interval: 4s
+      timeout: 3s
+      retries: 40
+
+  signature-activation-service:
+    image: golang:1.25-bookworm
+    working_dir: /workspace
+    network_mode: service:keycloak
+    depends_on:
+      key-certificate-service:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+      SIGNBIRD_DOCUMENT_SERVICE_TOKEN: signbird-local-document-activation-0001
+      SIGNBIRD_ACTIVATION_DATABASE_URL: postgres://signbird:signbird-dev@postgres:5432/signbird?sslmode=disable
+      SIGNBIRD_ACTIVATION_API_TOKEN: signbird-local-only-activation-api-0001
+      SIGNBIRD_ACTIVATION_SIGNER_TOKEN: signbird-local-only-activation-signer-0001
+      SIGNBIRD_TOTP_ENCRYPTION_KEY: c2lnbmJpcmQtbG9jYWwtdGVzdC10b3RwLWtleS0wMDE=
+    volumes:
+      - ./signature-activation-service:/workspace:ro
+      - go-modules:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    command: ["go", "run", "./cmd/signature-activation-service"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8082/healthz"]
+      interval: 4s
+      timeout: 3s
+      retries: 40
+
+  api-service:
+    image: golang:1.25-bookworm
+    working_dir: /workspace
+    network_mode: service:keycloak
+    depends_on:
+      signature-activation-service:
+        condition: service_healthy
+    environment:
+      <<: *service-env
+      SIGNBIRD_DOCUMENT_GATEWAY_TOKEN: signbird-local-document-gateway-0001
+      SIGNBIRD_ACTIVATION_API_TOKEN: signbird-local-only-activation-api-0001
+    volumes:
+      - ./api-service:/workspace:ro
+      - go-modules:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    command:
+      - sh
+      - -ec
+      - |
+        go build -o /tmp/api-service ./cmd/api-service
+        exec /tmp/api-service
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/healthz"]
+      interval: 4s
+      timeout: 3s
+      retries: 40
+
+  document-signing-service:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /workspace
+    network_mode: service:keycloak
+    depends_on:
+      api-service:
+        condition: service_healthy
+    environment:
+      SIGNBIRD_DOCUMENT_GATEWAY_TOKEN: signbird-local-document-gateway-0001
+      SIGNBIRD_DOCUMENT_SERVICE_TOKEN: signbird-local-document-activation-0001
+      SIGNBIRD_DOCUMENT_DATABASE_URL: jdbc:postgresql://postgres:5432/signbird
+      SIGNBIRD_DOCUMENT_DATABASE_USER: signbird
+      SIGNBIRD_DOCUMENT_DATABASE_PASSWORD: signbird-dev
+      SIGNBIRD_DOCUMENT_DIR: /documents
+      SIGNBIRD_DOCUMENT_UPLOAD_DIR: /uploads
+      SIGNBIRD_P7M_RETENTION_HOURS: ${SIGNBIRD_P7M_RETENTION_HOURS:-24}
+    volumes:
+      - ./document-signing-service:/workspace:ro
+      - document-build:/workspace/target
+      - document-maven:/root/.m2
+      - document-storage:/documents
+    tmpfs:
+      - /uploads:mode=0700
+    command: ["sh", "-ec", "umask 077; mvn -B -q -DskipTests package; exec java -jar target/document-signing-service-0.1.0.jar"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8083/healthz"]
+      interval: 4s
+      timeout: 3s
+      retries: 60
+
+  web-portal:
+    image: node:22-bookworm-slim
+    working_dir: /workspace
+    network_mode: service:keycloak
+    depends_on:
+      document-signing-service:
+        condition: service_healthy
+    environment:
+      VITE_KEYCLOAK_URL: http://localhost:8180
+      VITE_KEYCLOAK_REALM: signbird
+      VITE_KEYCLOAK_CLIENT_ID: signbird-web
+      SIGNBIRD_API_PROXY_TARGET: http://127.0.0.1:8080
+    volumes:
+      - ./web-portal:/workspace:ro
+      - web-dependencies:/workspace/node_modules
+    command:
+      - sh
+      - -ec
+      - |
+        npm ci --no-audit --no-fund
+        exec npm run dev -- --host 0.0.0.0
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 4s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
+  keycloak-data:
+  test-ca:
+  go-modules:
+  go-build:
+  web-dependencies:
+  document-storage:
+  document-build:
+  document-maven:
