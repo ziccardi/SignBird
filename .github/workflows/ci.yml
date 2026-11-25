@@ -125,3 +125,25 @@ jobs:
         run: make -C web-portal install
       - name: Check TypeScript and build the portal
         run: make -C web-portal check
+
+  changelog:
+    name: Generate changelog
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Generate changelog from Git history
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$PWD,dst=/repo,readonly" --workdir /repo \
+            orhunp/git-cliff@sha256:0f72b15def11c5836c9dfb2e4da8b9b52b4bc2c8c2f46c47701b7e68f3998ff7 \
+            > CHANGELOG.md
+      - name: Upload changelog
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: changelog
+          path: CHANGELOG.md
+          if-no-files-found: error

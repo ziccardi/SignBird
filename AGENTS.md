@@ -36,6 +36,8 @@ SignBird is a remote signing system. These instructions apply throughout the rep
 
 ## Verifying changes
 
+- CI generates `CHANGELOG.md` from Conventional Commits. Download it from the workflow run as the `changelog` artifact.
+
 - GitHub Actions runs Go checks and PostgreSQL integration tests, Maven verification, and the portal build on pull requests and pushes to `main`. Keep `.github/workflows/ci.yml` aligned with the module Makefiles. Pull requests also validate each new commit against Conventional Commits. Use a header such as `feat(portal): add certificate filters`.
 
 - Run `make check` from the repository root to verify all services with the local runtimes. The module Makefiles expose development commands for individual services. Use these targets in README examples.
