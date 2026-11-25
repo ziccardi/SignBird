@@ -1,4 +1,4 @@
-package signbird.documents;
+package io.github.ziccardi.signbird.documents;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

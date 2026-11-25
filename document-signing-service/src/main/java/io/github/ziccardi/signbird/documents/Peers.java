@@ -1,4 +1,4 @@
-package signbird.documents;
+package io.github.ziccardi.signbird.documents;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;

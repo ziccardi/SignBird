@@ -1,4 +1,4 @@
-package signbird.documents;
+package io.github.ziccardi.signbird.documents;
 
 import eu.europa.esig.dss.cades.CAdESSignatureParameters;
 import eu.europa.esig.dss.cades.signature.CAdESService;

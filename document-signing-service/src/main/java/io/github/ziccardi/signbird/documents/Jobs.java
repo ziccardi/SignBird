@@ -1,4 +1,4 @@
-package signbird.documents;
+package io.github.ziccardi.signbird.documents;
 
 import java.io.IOException;
 import java.io.InputStream;

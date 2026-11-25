@@ -1,4 +1,4 @@
-package signbird.documents;
+package io.github.ziccardi.signbird.documents;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
