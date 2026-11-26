@@ -21,9 +21,8 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 svg { flex-shrink: 0; }
 .shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 .sidebar { background: var(--dark); color: #f4f8f3; display: flex; flex-direction: column; padding: 32px 18px 22px; gap: 45px; }
-.brand { display: inline-flex; gap: 11px; align-items: center; font-size: 25px; font-weight: 730; letter-spacing: -.8px; }
-.sidebar .brand { margin-left: 10px; }
-.brand-mark { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 12px; background: var(--accent); color: var(--dark); }
+.brand { display: block; width: min(100%, 310px); height: auto; background: #fff; border-radius: 10px; }
+.sidebar .brand { width: 100%; }
 .nav-current { display: flex; align-items: center; gap: 10px; padding: 13px 11px; border-radius: 9px; background: #29382e; color: #eff8eb; font-size: 14px; font-weight: 600; text-decoration: none; }
 .nav-current svg:first-child { color: var(--accent); }
 .nav-current svg:last-child { margin-left: auto; color: #a7b7a7; }
@@ -98,7 +97,7 @@ dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 620px) {
   .shell { display: block; }
   .sidebar { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 17px; }
-  .sidebar .brand { margin: 0; font-size: 21px; }
+  .sidebar .brand { width: min(205px, calc(100% - 84px)); }
   .sidebar nav { display: none; }
   .profile { padding: 0; border: 0; margin: 0; }
   .profile > span { display: none; }

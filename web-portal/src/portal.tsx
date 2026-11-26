@@ -1,5 +1,6 @@
-import { ArrowDownToLine, ArrowRight, BadgeCheck, ChevronRight, Feather, KeyRound, LogOut, Plus, RefreshCw, ShieldCheck, Signature } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, BadgeCheck, ChevronRight, KeyRound, LogOut, Plus, RefreshCw, ShieldCheck, Signature } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import logo from './assets/signerbird-logo.png'
 import type { Certificate, Key, KeyAlgorithm, KeyCapability, KeyService } from './api'
 import { AuthenticatorPanel, CodeField } from './authenticator'
 import { DocumentSigningPanel } from './documents'
@@ -9,7 +10,7 @@ import { SigningPanel } from './signing'
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Operation failed.'
 
 export function Brand() {
-  return <div className="brand"><span className="brand-mark"><Feather size={23} aria-hidden="true" /></span><span>SignBird</span></div>
+  return <img className="brand" src={logo} width={2172} height={724} alt="SignerBird — Sign on the fly" />
 }
 
 function download(name: string, pem: string) {
