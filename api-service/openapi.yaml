@@ -147,6 +147,57 @@ paths:
           description: Alias updated
         default:
           $ref: '#/components/responses/Error'
+  /v1/keys/{keyId}/csr:
+    post:
+      operationId: createKeyCsr
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/TotpCodeHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCsrRequest'
+      responses:
+        '200':
+          description: PKCS#10 certificate signing request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Csr'
+        default:
+          $ref: '#/components/responses/Error'
+  /v1/keys/{keyId}/certificates:
+    post:
+      operationId: importKeyCertificate
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/TotpCodeHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCertificateRequest'
+      responses:
+        '201':
+          description: CA-issued certificate imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        default:
+          $ref: '#/components/responses/Error'
   /v1/certificates:
     post:
       operationId: issueCertificate
@@ -636,5 +687,35 @@ components:
       required: [alias]
       additionalProperties: false
       properties:
+        alias:
+          $ref: '#/components/schemas/Alias'
+
+    CreateCsrRequest:
+      type: object
+      additionalProperties: false
+      required: [commonName]
+      properties:
+        commonName:
+          type: string
+          minLength: 1
+          maxLength: 64
+    Csr:
+      type: object
+      required: [csrPem]
+      properties:
+        csrPem:
+          type: string
+          description: PEM-encoded PKCS#10 certificate signing request
+    ImportCertificateRequest:
+      type: object
+      additionalProperties: false
+      required: [certificatePem]
+      properties:
+        certificatePem:
+          type: string
+          description: Single PEM-encoded end-entity certificate
+        chainPem:
+          type: string
+          description: Optional PEM issuer chain, starting with the direct issuer
         alias:
           $ref: '#/components/schemas/Alias'

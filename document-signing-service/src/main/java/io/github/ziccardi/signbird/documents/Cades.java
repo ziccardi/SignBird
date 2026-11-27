@@ -34,8 +34,10 @@ final class Cades {
         var tokens = new ArrayList<CertificateToken>();
         var signer = new CertificateToken(leaf);
         tokens.add(signer);
-        for (var item : factory.generateCertificates(new ByteArrayInputStream(chain.getBytes(StandardCharsets.US_ASCII)))) {
-            if (!leaf.equals(item)) tokens.add(new CertificateToken((X509Certificate) item));
+        if (!chain.isBlank()) {
+            for (var item : factory.generateCertificates(new ByteArrayInputStream(chain.getBytes(StandardCharsets.US_ASCII)))) {
+                if (!leaf.equals(item)) tokens.add(new CertificateToken((X509Certificate) item));
+            }
         }
         var parameters = new CAdESSignatureParameters();
         parameters.setSignatureLevel(SignatureLevel.CAdES_BASELINE_B);

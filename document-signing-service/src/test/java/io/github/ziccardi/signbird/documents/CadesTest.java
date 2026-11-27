@@ -45,7 +45,8 @@ final class CadesTest {
         var original = Files.write(directory.resolve("data"), content);
         var signed = directory.resolve("data.p7m");
         var cades = new Cades();
-        String digest = cades.prepare(original, pem, pem, now);
+        String chain = "EC".equals(keyType) ? "" : pem;
+        String digest = cades.prepare(original, pem, chain, now);
 
         var signer = Signature.getInstance("NONEwith" + algorithm);
         signer.initSign(key.getPrivate());
@@ -59,7 +60,7 @@ final class CadesTest {
             signer.update(digestBytes);
         }
         String signature = Base64.getEncoder().encodeToString(signer.sign());
-        cades.assemble(original, signed, pem, pem, now, digest, signature);
+        cades.assemble(original, signed, pem, chain, now, digest, signature);
         var result = new CMSSignedData(Files.readAllBytes(signed));
         assertArrayEquals(content, (byte[]) result.getSignedContent().getContent());
         var signerInfo = result.getSignerInfos().getSigners().iterator().next();
@@ -67,6 +68,6 @@ final class CadesTest {
 
         Files.write(original, new byte[] { 7 });
         assertThrows(GeneralSecurityException.class,
-                () -> cades.assemble(original, signed, pem, pem, now, digest, signature));
+                () -> cades.assemble(original, signed, pem, chain, now, digest, signature));
     }
 }

@@ -84,6 +84,8 @@ func (s *service) routes() http.Handler {
 	mux.HandleFunc("GET /v1/keys/{keyId}", s.getKey)
 	mux.HandleFunc("PATCH /v1/keys/{keyId}", s.renameKey)
 	mux.HandleFunc("PATCH /v1/keys/{keyId}/certificates/{certificateId}", s.renameCertificate)
+	mux.HandleFunc("POST /v1/keys/{keyId}/csr", s.createCSR)
+	mux.HandleFunc("POST /v1/keys/{keyId}/certificates", s.importCertificate)
 	mux.HandleFunc("POST /v1/certificates", s.issueCertificate)
 	return mux
 }

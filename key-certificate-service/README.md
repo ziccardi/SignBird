@@ -45,6 +45,8 @@ For key creation, certificate issuance, and renewal, run the [Signature Activati
 
 - Key creation and certificate issuance accept an optional `alias`. Use `PATCH /v1/keys/{keyId}` or `PATCH /v1/keys/{keyId}/certificates/{certificateId}` with `{"alias":"New name"}` to rename an existing item. An empty alias clears the display name. Aliases are at most 80 characters and leave key, certificate, and credential identifiers unchanged.
 
+- `POST /v1/keys/{keyId}/csr` creates a signed PKCS#10 request in PEM format for the supplied common name. `POST /v1/keys/{keyId}/certificates` imports a CA-issued PEM certificate and an optional issuer chain. Both require a fresh `X-TOTP-Code`. The import checks the public key, current validity, signing key usage, and the signature links in any supplied chain. Trust in the issuing CA is evaluated by the document recipient. The service registers the imported certificate and a signing credential without changing the key.
+
 Files created by the earlier API Service prototype require an explicit import into the new registry. Key destruction, revocation, and qualified provider integration still need implementation and their respective authorization flows.
 
 ## Upgrading from filesystem storage

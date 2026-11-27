@@ -87,6 +87,11 @@ type Certificate struct {
 	NotBefore      time.Time `json:"notBefore"`
 }
 
+// CreateCsrRequest defines model for CreateCsrRequest.
+type CreateCsrRequest struct {
+	CommonName string `json:"commonName"`
+}
+
 // CreateDigestSignatureRequest defines model for CreateDigestSignatureRequest.
 type CreateDigestSignatureRequest struct {
 	CredentialId string `json:"credentialId"`
@@ -109,6 +114,12 @@ type CreateKeyRequest struct {
 // CreateKeyRequestKeystoreId defines model for CreateKeyRequest.KeystoreId.
 type CreateKeyRequestKeystoreId string
 
+// Csr defines model for Csr.
+type Csr struct {
+	// CsrPem PEM-encoded PKCS#10 certificate signing request
+	CsrPem string `json:"csrPem"`
+}
+
 // DigestCapability defines model for DigestCapability.
 type DigestCapability struct {
 	Algorithm   HashAlgorithm `json:"algorithm"`
@@ -122,6 +133,18 @@ type Error struct {
 
 // HashAlgorithm defines model for HashAlgorithm.
 type HashAlgorithm string
+
+// ImportCertificateRequest defines model for ImportCertificateRequest.
+type ImportCertificateRequest struct {
+	// Alias Optional display name. An empty string clears the alias.
+	Alias *Alias `json:"alias,omitempty"`
+
+	// CertificatePem Single PEM-encoded end-entity certificate
+	CertificatePem string `json:"certificatePem"`
+
+	// ChainPem Optional PEM issuer chain, starting with the direct issuer
+	ChainPem *string `json:"chainPem,omitempty"`
+}
 
 // IssueCertificateRequest defines model for IssueCertificateRequest.
 type IssueCertificateRequest struct {
@@ -270,8 +293,23 @@ type RenameKeyParams struct {
 	XTOTPCode TotpCodeHeader `json:"X-TOTP-Code"`
 }
 
+// ImportKeyCertificateParams defines parameters for ImportKeyCertificate.
+type ImportKeyCertificateParams struct {
+	// XTOTPCode Fresh six-digit authenticator code for this change
+	XTOTPCode TotpCodeHeader `json:"X-TOTP-Code"`
+
+	// IdempotencyKey Reuse the same value to retry a creation or issuance.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // RenameCertificateParams defines parameters for RenameCertificate.
 type RenameCertificateParams struct {
+	// XTOTPCode Fresh six-digit authenticator code for this change
+	XTOTPCode TotpCodeHeader `json:"X-TOTP-Code"`
+}
+
+// CreateKeyCsrParams defines parameters for CreateKeyCsr.
+type CreateKeyCsrParams struct {
 	// XTOTPCode Fresh six-digit authenticator code for this change
 	XTOTPCode TotpCodeHeader `json:"X-TOTP-Code"`
 }
@@ -301,8 +339,14 @@ type CreateKeyJSONRequestBody = CreateKeyRequest
 // RenameKeyJSONRequestBody defines body for RenameKey for application/json ContentType.
 type RenameKeyJSONRequestBody = UpdateAliasRequest
 
+// ImportKeyCertificateJSONRequestBody defines body for ImportKeyCertificate for application/json ContentType.
+type ImportKeyCertificateJSONRequestBody = ImportCertificateRequest
+
 // RenameCertificateJSONRequestBody defines body for RenameCertificate for application/json ContentType.
 type RenameCertificateJSONRequestBody = UpdateAliasRequest
+
+// CreateKeyCsrJSONRequestBody defines body for CreateKeyCsr for application/json ContentType.
+type CreateKeyCsrJSONRequestBody = CreateCsrRequest
 
 // CreateDigestSignatureJSONRequestBody defines body for CreateDigestSignature for application/json ContentType.
 type CreateDigestSignatureJSONRequestBody = CreateDigestSignatureRequest
@@ -349,8 +393,14 @@ type ServerInterface interface {
 	// (PATCH /v1/keys/{keyId})
 	RenameKey(w http.ResponseWriter, r *http.Request, keyId string, params RenameKeyParams)
 
+	// (POST /v1/keys/{keyId}/certificates)
+	ImportKeyCertificate(w http.ResponseWriter, r *http.Request, keyId string, params ImportKeyCertificateParams)
+
 	// (PATCH /v1/keys/{keyId}/certificates/{certificateId})
 	RenameCertificate(w http.ResponseWriter, r *http.Request, keyId string, certificateId string, params RenameCertificateParams)
+
+	// (POST /v1/keys/{keyId}/csr)
+	CreateKeyCsr(w http.ResponseWriter, r *http.Request, keyId string, params CreateKeyCsrParams)
 
 	// (GET /v1/signatures/digest)
 	ListDigestSignatures(w http.ResponseWriter, r *http.Request)
@@ -731,6 +781,84 @@ func (siw *ServerInterfaceWrapper) RenameKey(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ImportKeyCertificate operation middleware
+func (siw *ServerInterfaceWrapper) ImportKeyCertificate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "keyId" -------------
+	var keyId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "keyId", r.PathValue("keyId"), &keyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "keyId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportKeyCertificateParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-TOTP-Code" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-TOTP-Code")]; found {
+		var XTOTPCode TotpCodeHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-TOTP-Code", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-TOTP-Code", valueList[0], &XTOTPCode, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-TOTP-Code", Err: err})
+			return
+		}
+
+		params.XTOTPCode = XTOTPCode
+
+	} else {
+		err := fmt.Errorf("Header parameter X-TOTP-Code is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-TOTP-Code", Err: err})
+		return
+	}
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportKeyCertificate(w, r, keyId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RenameCertificate operation middleware
 func (siw *ServerInterfaceWrapper) RenameCertificate(w http.ResponseWriter, r *http.Request) {
 
@@ -790,6 +918,65 @@ func (siw *ServerInterfaceWrapper) RenameCertificate(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RenameCertificate(w, r, keyId, certificateId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateKeyCsr operation middleware
+func (siw *ServerInterfaceWrapper) CreateKeyCsr(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "keyId" -------------
+	var keyId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "keyId", r.PathValue("keyId"), &keyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "keyId", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateKeyCsrParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-TOTP-Code" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-TOTP-Code")]; found {
+		var XTOTPCode TotpCodeHeader
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-TOTP-Code", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-TOTP-Code", valueList[0], &XTOTPCode, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-TOTP-Code", Err: err})
+			return
+		}
+
+		params.XTOTPCode = XTOTPCode
+
+	} else {
+		err := fmt.Errorf("Header parameter X-TOTP-Code is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-TOTP-Code", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateKeyCsr(w, r, keyId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1194,7 +1381,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/v1/keys/capabilities", wrapper.GetKeyCapabilities)
 	m.HandleFunc("GET "+options.BaseURL+"/v1/keys/{keyId}", wrapper.GetKey)
 	m.HandleFunc("PATCH "+options.BaseURL+"/v1/keys/{keyId}", wrapper.RenameKey)
+	m.HandleFunc("POST "+options.BaseURL+"/v1/keys/{keyId}/certificates", wrapper.ImportKeyCertificate)
 	m.HandleFunc("PATCH "+options.BaseURL+"/v1/keys/{keyId}/certificates/{certificateId}", wrapper.RenameCertificate)
+	m.HandleFunc("POST "+options.BaseURL+"/v1/keys/{keyId}/csr", wrapper.CreateKeyCsr)
 	m.HandleFunc("GET "+options.BaseURL+"/v1/signatures/digest", wrapper.ListDigestSignatures)
 	m.HandleFunc("POST "+options.BaseURL+"/v1/signatures/digest", wrapper.CreateDigestSignature)
 	m.HandleFunc("GET "+options.BaseURL+"/v1/signatures/digest/{requestId}", wrapper.GetDigestSignature)

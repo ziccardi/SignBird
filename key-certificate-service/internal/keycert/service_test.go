@@ -239,6 +239,53 @@ func TestKeyAndCertificateLifecycle(t *testing.T) {
 		t.Fatal("aliases were not cleared")
 	}
 
+	var csrResult map[string]string
+	csrPath := keyPath + "/csr"
+	call("bob", "POST", csrPath, `{"commonName":"Example signer"}`, "", 404)
+	readResponse(t, call("alice", "POST", csrPath, `{"commonName":"Example signer"}`, "", 200), &csrResult)
+	csrPEM, _ := pem.Decode([]byte(csrResult["csrPem"]))
+	if csrPEM == nil || csrPEM.Type != "CERTIFICATE REQUEST" {
+		t.Fatal("missing PKCS#10 PEM")
+	}
+	csr, err := x509.ParseCertificateRequest(csrPEM.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := csr.CheckSignature(); err != nil {
+		t.Fatal(err)
+	}
+	if csr.Subject.CommonName != "Example signer" || asPEM("PUBLIC KEY", csr.RawSubjectPublicKeyInfo) != namedKey.PublicKey {
+		t.Fatal("CSR does not match the selected key and subject")
+	}
+
+	external := makeTestCA(t)
+	now := time.Now().UTC()
+	template := &x509.Certificate{SerialNumber: big.NewInt(42), Subject: csr.Subject,
+		NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature}
+	issuedDER, err := x509.CreateCertificate(rand.Reader, template, external.cert, csr.PublicKey, external.signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuedPEM := asPEM("CERTIFICATE", issuedDER)
+	importPayload, err := json.Marshal(map[string]string{"certificatePem": issuedPEM,
+		"chainPem": asPEM("CERTIFICATE", external.cert.Raw), "alias": "External CA"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	importPath := keyPath + "/certificates"
+	call("bob", "POST", importPath, string(importPayload), "", 404)
+	call("alice", "POST", "/v1/keys/"+id+"/certificates", string(importPayload), "", 400)
+	importedResponse := call("alice", "POST", importPath, string(importPayload), "import-1", 201)
+	if retry := call("alice", "POST", importPath, string(importPayload), "import-1", 201); retry.Body.String() != importedResponse.Body.String() {
+		t.Fatal("import retry changed the result")
+	}
+	var imported certificateResponse
+	readResponse(t, importedResponse, &imported)
+	if imported.CertificatePEM != issuedPEM || imported.Alias != "External CA" {
+		t.Fatal("imported certificate was not preserved")
+	}
+	call("alice", "GET", "/internal/signing-credentials/"+imported.CredentialID, "", "", 200)
+
 	var profiles []keyCapability
 	readResponse(t, call("alice", "GET", "/v1/keys/capabilities", "", "", 200), &profiles)
 	if len(profiles) != 3 {

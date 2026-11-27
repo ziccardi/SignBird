@@ -118,3 +118,11 @@ func (s *apiService) RenameKey(w http.ResponseWriter, r *http.Request, _ string,
 func (s *apiService) RenameCertificate(w http.ResponseWriter, r *http.Request, _, _ string, _ RenameCertificateParams) {
 	s.upstream.ServeHTTP(w, r)
 }
+
+func (s *apiService) CreateKeyCsr(w http.ResponseWriter, r *http.Request, _ string, _ CreateKeyCsrParams) {
+	s.upstream.ServeHTTP(w, r)
+}
+
+func (s *apiService) ImportKeyCertificate(w http.ResponseWriter, r *http.Request, _ string, _ ImportKeyCertificateParams) {
+	s.upstream.ServeHTTP(w, r)
+}
