@@ -1,6 +1,7 @@
 package keycert
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/tls"
@@ -130,23 +131,9 @@ func (s *service) issueCertificate(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	container, err := queries.GetPKCS12(ctx, key.ObjectRef)
+	privateKey, err := s.loadSigningKey(ctx, queries, key)
 	if err != nil {
 		internalError(w, err)
-		return
-	}
-	privateKey, err := s.store.decode(container)
-	if err != nil {
-		internalError(w, err)
-		return
-	}
-	publicKey, err := publicKeyPEM(privateKey)
-	if err != nil {
-		internalError(w, err)
-		return
-	}
-	if publicKey != key.PublicKey {
-		internalError(w, errors.New("PKCS#12 public key differs from registered key"))
 		return
 	}
 	cert, csr, err := s.ca.issue(key.KeyID, privateKey)
@@ -155,19 +142,7 @@ func (s *service) issueCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cert.Alias = alias
-	err = queries.InsertCertificate(ctx, db.InsertCertificateParams{
-		CertificateID: cert.CertificateID, KeyID: key.KeyID, CertificatePem: cert.CertificatePEM,
-		ChainPem: cert.ChainPEM, Alias: alias, CsrPem: csr, RequestID: requestID,
-		NotBefore: pgtype.Timestamptz{Time: cert.NotBefore, Valid: true},
-		NotAfter:  pgtype.Timestamptz{Time: cert.NotAfter, Valid: true},
-	})
-	if err != nil {
-		internalError(w, err)
-		return
-	}
-	if err := queries.InsertCredential(ctx, db.InsertCredentialParams{
-		CredentialID: cert.CredentialID, KeyID: key.KeyID, CertificateID: cert.CertificateID,
-	}); err != nil {
+	if err := saveCertificate(ctx, queries, key.KeyID, requestID, cert, csr); err != nil {
 		internalError(w, err)
 		return
 	}
@@ -176,4 +151,38 @@ func (s *service) issueCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reply(w, http.StatusCreated, cert)
+}
+
+func (s *service) loadSigningKey(ctx context.Context, queries *db.Queries, key db.Key) (crypto.Signer, error) {
+	container, err := queries.GetPKCS12(ctx, key.ObjectRef)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := s.store.decode(container)
+	if err != nil {
+		return nil, err
+	}
+	publicKey, err := publicKeyPEM(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	if publicKey != key.PublicKey || keyAlgorithm(privateKey.Public()) != key.Algorithm {
+		return nil, errors.New("PKCS#12 key differs from registered key")
+	}
+	return privateKey, nil
+}
+
+func saveCertificate(ctx context.Context, queries *db.Queries, keyID, requestID string, cert certificateResponse, csr string) error {
+	err := queries.InsertCertificate(ctx, db.InsertCertificateParams{
+		CertificateID: cert.CertificateID, KeyID: keyID, CertificatePem: cert.CertificatePEM,
+		ChainPem: cert.ChainPEM, Alias: cert.Alias, CsrPem: csr, RequestID: requestID,
+		NotBefore: pgtype.Timestamptz{Time: cert.NotBefore, Valid: true},
+		NotAfter:  pgtype.Timestamptz{Time: cert.NotAfter, Valid: true},
+	})
+	if err != nil {
+		return err
+	}
+	return queries.InsertCredential(ctx, db.InsertCredentialParams{
+		CredentialID: cert.CredentialID, KeyID: keyID, CertificateID: cert.CertificateID,
+	})
 }

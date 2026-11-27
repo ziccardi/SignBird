@@ -9,6 +9,15 @@ import { SigningPanel } from './signing'
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Operation failed.'
 
+async function certificatePem(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const text = new TextDecoder().decode(bytes)
+  if (text.trimStart().startsWith('-----BEGIN ')) return text
+  const encoded = btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(''))
+  const lines = encoded.match(/.{1,64}/g)?.join('\n') ?? ''
+  return `-----BEGIN CERTIFICATE-----\n${lines}\n-----END CERTIFICATE-----\n`
+}
+
 export function Brand() {
   return <img className="brand" src={logo} width={2172} height={724} alt="SignerBird — Sign on the fly" />
 }
@@ -61,10 +70,15 @@ export function Dashboard({ service, name, logout, demo = false }: {
   const [change, setChange] = useState<
     | { action: 'create'; title: string }
     | { action: 'issue'; title: string; key: Key }
+    | { action: 'csr' | 'import'; title: string; key: Key }
     | { action: 'rename-key'; title: string; key: Key }
     | { action: 'rename-certificate'; title: string; key: Key; certificate: Certificate }
   >()
   const [alias, setAlias] = useState('')
+  const [commonName, setCommonName] = useState('')
+  const [certificateFile, setCertificateFile] = useState<File>()
+  const [chainFile, setChainFile] = useState<File>()
+  const [preparedCsr, setPreparedCsr] = useState<{ keyId: string; pem: string }>()
   const aliasInput = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (change) aliasInput.current?.focus()
@@ -133,6 +147,10 @@ export function Dashboard({ service, name, logout, demo = false }: {
     setError('')
     setNotice('')
     setAlgorithm(capabilities[0]?.algorithm)
+    setCommonName(next.action === 'csr' ? next.key.alias?.slice(0, 64) ?? '' : '')
+    setCertificateFile(undefined)
+    setChainFile(undefined)
+    setPreparedCsr(undefined)
     setAlias(next.action === 'rename-key' ? next.key.alias ?? '' :
       next.action === 'rename-certificate' ? next.certificate.alias ?? '' : '')
     setChange(next)
@@ -165,6 +183,39 @@ export function Dashboard({ service, name, logout, demo = false }: {
       setDetail({ ...key, certificates: [certificate, ...history] })
       setChange(undefined)
       setNotice('Certificate issued.')
+    })
+  }
+
+  function createCsr(key: Key, otp: string) {
+    const external = service.externalCertificates
+    if (!external) return
+    void run('Generating certificate request…', async () => {
+      const pem = await external.createCsr(key.keyId, commonName.trim(), otp)
+      setPreparedCsr({ keyId: key.keyId, pem })
+      setChange(undefined)
+      setNotice('Certificate request ready.')
+    })
+  }
+
+  function importCertificate(key: Key, otp: string) {
+    const external = service.externalCertificates
+    if (!external || !certificateFile) return
+    void run('Importing certificate…', async () => {
+      if (certificateFile.size + (chainFile?.size ?? 0) > 64 * 1024) {
+        throw new Error('The certificate and issuer chain are too large.')
+      }
+      const input = {
+        certificatePem: await certificatePem(certificateFile),
+        chainPem: chainFile ? await chainFile.text() : undefined,
+        alias,
+      }
+      const fingerprint = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(input)))
+      const operation = `import:${key.keyId}:${btoa(String.fromCharCode(...new Uint8Array(fingerprint)))}`
+      const certificate = await mutate(operation, id => external.importCertificate(key.keyId, id, otp, input))
+      const history = (key.certificates ?? []).filter(item => item.certificateId !== certificate.certificateId)
+      setDetail({ ...key, certificates: [certificate, ...history] })
+      setChange(undefined)
+      setNotice('Certificate imported.')
     })
   }
 
@@ -221,6 +272,8 @@ export function Dashboard({ service, name, logout, demo = false }: {
           {busy && <p className="feedback" role="status">{busy}</p>}
           {notice && <p className="feedback success" role="status">{notice}</p>}
           {error && <p className="feedback error" role="alert">{error}</p>}
+          {preparedCsr && <button className="secondary file-button" onClick={() =>
+            download(`${preparedCsr.keyId}.csr`, preparedCsr.pem)}><ArrowDownToLine size={16} /> Download CSR</button>}
           {change && <section className="panel signing-panel change-panel">
             <h2>{change.title}</h2>
             {'key' in change && <p>Key <strong>{keyName(change.key)}</strong></p>}
@@ -230,7 +283,9 @@ export function Dashboard({ service, name, logout, demo = false }: {
               if (change.action === 'create') {
                 if (algorithm) createKey(code, algorithm)
               } else if (change.action === 'issue') issueCertificate(change.key, code)
-              else rename(change, code)
+              else if (change.action === 'csr') createCsr(change.key, code)
+              else if (change.action === 'import') importCertificate(change.key, code)
+              else if (change.action === 'rename-key' || change.action === 'rename-certificate') rename(change, code)
               setCode('')
             }}>
               {change.action === 'create' && <label>Key algorithm
@@ -240,9 +295,19 @@ export function Dashboard({ service, name, logout, demo = false }: {
                   {capabilities.map(({ algorithm: option }) => <option key={option}>{option}</option>)}
                 </select>
               </label>}
-              <label>Alias (optional)
-                <input ref={aliasInput} value={alias} onChange={event => setAlias(event.target.value)}  />
-              </label>
+              {change.action === 'csr' ? <label>Certificate common name
+                <input ref={aliasInput} value={commonName} onChange={event => setCommonName(event.target.value)} required maxLength={64} />
+              </label> : <label>Alias (optional)
+                <input ref={aliasInput} value={alias} onChange={event => setAlias(event.target.value)} />
+              </label>}
+              {change.action === 'import' && <>
+                <label>CA-issued certificate (PEM or DER)
+                  <input type="file" accept=".pem,.crt,.cer,.der" required onChange={event => setCertificateFile(event.target.files?.[0])} />
+                </label>
+                <label>Issuer chain (optional PEM, direct issuer first)
+                  <input type="file" accept=".pem,.crt,.cer" onChange={event => setChainFile(event.target.files?.[0])} />
+                </label>
+              </>}
               {service.activation && <>
                 <CodeField id="change-code" code={code} setCode={setCode} />
                 <p>For first-time use, <a href="#authenticator" onClick={() => { setChange(undefined); setCode('') }}>set up your authenticator</a>.</p>
@@ -284,15 +349,23 @@ export function Dashboard({ service, name, logout, demo = false }: {
                     <div><dt>Algorithm</dt><dd>{detail.algorithm}</dd></div>
                     <div><dt>Keystore</dt><dd>{detail.keystoreId}</dd></div>
                   </dl>
-                  {detail.publicKey && <button className="secondary file-button" onClick={() => download(`${detail.keyId}-public.pem`, detail.publicKey)}><ArrowDownToLine size={16} /> Public key</button>}
-                  <button type="button" className="secondary file-button" disabled={!!busy} onClick={() =>
-                    openChange({ action: 'rename-key', title: 'Edit key alias', key: detail })}>Edit key alias</button>
+                  <div className="change-actions file-button">
+                    {detail.publicKey && <button className="secondary" onClick={() => download(`${detail.keyId}-public.pem`, detail.publicKey)}><ArrowDownToLine size={16} /> Public key</button>}
+                    <button type="button" className="secondary" disabled={!!busy} onClick={() =>
+                      openChange({ action: 'rename-key', title: 'Edit key alias', key: detail })}>Edit key alias</button>
+                  </div>
                   <div className="history">
                     <h3>Certificates <span className="count">{history.length}</span></h3>
                     {history.length ? <ul>{history.map(certificate => <CertificateEntry key={certificate.certificateId} certificate={certificate}
                       disabled={!!busy} onRename={() => openChange({
                         action: 'rename-certificate', title: 'Edit certificate alias', key: detail, certificate,
                       })} />)}</ul> : <p>No certificates have been issued for this key.</p>}
+                    {service.externalCertificates && <div className="change-actions file-button">
+                      <button className="secondary" disabled={!!busy} onClick={() =>
+                        openChange({ action: 'csr', title: 'Generate CSR', key: detail })}>Generate CSR</button>
+                      <button className="secondary" disabled={!!busy} onClick={() =>
+                        openChange({ action: 'import', title: 'Import certificate', key: detail })}>Import certificate</button>
+                    </div>}
                     <button className="secondary issue" disabled={!!busy} onClick={() => openChange({ action: 'issue', title: history.length ? 'Renew certificate' : 'Issue certificate', key: detail })}>{history.length ? 'Renew certificate' : 'Issue certificate'} <ArrowRight size={16} /></button>
                   </div>
                 </div>

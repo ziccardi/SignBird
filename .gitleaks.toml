@@ -1,0 +1,5 @@
+[allowlist]
+description = "Ephemeral PostgreSQL credentials for GitHub Actions integration tests"
+regexes = [
+  '''(^|://)signbird:signbird-ci(@|$)''',
+]

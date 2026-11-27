@@ -26,7 +26,13 @@ export interface ActivationService {
   approve(requestId: string, code: string): Promise<SignatureRequest>
 }
 
+type ImportCertificate = components['schemas']['ImportCertificateRequest']
+
 export interface KeyService {
+  externalCertificates?: {
+    createCsr(keyId: string, commonName: string, code: string): Promise<string>
+    importCertificate(keyId: string, requestId: string, code: string, certificate: ImportCertificate): Promise<Certificate>
+  }
   activation?: ActivationService
   documents?: DocumentService
   capabilities(): Promise<KeyCapability[]>
@@ -59,6 +65,21 @@ export function connectApi(getToken: () => Promise<string>): KeyService {
   })
 
   return {
+    externalCertificates: {
+      async createCsr(keyId, commonName, code) {
+        const result = read(await client.POST('/v1/keys/{keyId}/csr', {
+          params: { path: { keyId }, header: { 'X-TOTP-Code': code } },
+          body: { commonName },
+        }))
+        return result.csrPem
+      },
+      async importCertificate(keyId, requestId, code, certificate) {
+        return read(await client.POST('/v1/keys/{keyId}/certificates', {
+          params: { path: { keyId }, header: { 'Idempotency-Key': requestId, 'X-TOTP-Code': code } },
+          body: certificate,
+        }))
+      },
+    },
     documents: {
       async list() {
         return read(await client.GET('/v1/signatures/p7m'))

@@ -33,6 +33,10 @@ Open the [demo](http://127.0.0.1:5173/?demo=1) to try the portal without externa
 
 In development, Vite proxies `/v1` to the API Service. The Keycloak adapter uses Authorization Code with PKCE and keeps tokens in memory. Variables prefixed with `VITE_` are public and become part of the bundle.
 
+## Certificates issued by an external CA
+
+From **Keys and certificates**, select a key and choose **Generate CSR**. Enter the common name required by your CA and confirm with a fresh authenticator code. Download the PKCS#10 request and submit it to the CA. Then choose **Import certificate**, select the CA-issued certificate in PEM or DER format, optionally provide the PEM issuer chain, and confirm with a fresh code. The imported certificate appears under the key and supplies a signing credential.
+
 ## Build and API contract
 
 ```sh

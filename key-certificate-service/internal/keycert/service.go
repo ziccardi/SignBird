@@ -43,7 +43,11 @@ func keyView(key db.Key) keyResponse {
 }
 
 func decodeRequest(w http.ResponseWriter, r *http.Request, into any) bool {
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	return decodeRequestLimit(w, r, into, 4096)
+}
+
+func decodeRequestLimit(w http.ResponseWriter, r *http.Request, into any, limit int64) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(into) == nil && decoder.Decode(new(any)) == io.EOF
 }

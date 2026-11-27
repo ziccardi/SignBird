@@ -84,6 +84,38 @@ export interface paths {
         patch: operations["renameCertificate"];
         trace?: never;
     };
+    "/v1/keys/{keyId}/csr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createKeyCsr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/keys/{keyId}/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importKeyCertificate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/certificates": {
         parameters: {
             query?: never;
@@ -361,6 +393,20 @@ export interface components {
         UpdateAliasRequest: {
             alias: components["schemas"]["Alias"];
         };
+        CreateCsrRequest: {
+            commonName: string;
+        };
+        Csr: {
+            /** @description PEM-encoded PKCS#10 certificate signing request */
+            csrPem: string;
+        };
+        ImportCertificateRequest: {
+            /** @description Single PEM-encoded end-entity certificate */
+            certificatePem: string;
+            /** @description Optional PEM issuer chain, starting with the direct issuer */
+            chainPem?: string;
+            alias?: components["schemas"]["Alias"];
+        };
     };
     responses: {
         /** @description Request failed */
@@ -563,6 +609,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    createKeyCsr: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Fresh six-digit authenticator code for this change */
+                "X-TOTP-Code": components["parameters"]["TotpCodeHeader"];
+            };
+            path: {
+                keyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCsrRequest"];
+            };
+        };
+        responses: {
+            /** @description PKCS#10 certificate signing request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Csr"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    importKeyCertificate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Fresh six-digit authenticator code for this change */
+                "X-TOTP-Code": components["parameters"]["TotpCodeHeader"];
+                /** @description Reuse the same value to retry a creation or issuance. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                keyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCertificateRequest"];
+            };
+        };
+        responses: {
+            /** @description CA-issued certificate imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Certificate"];
+                };
             };
             default: components["responses"]["Error"];
         };
